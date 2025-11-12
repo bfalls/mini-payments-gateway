@@ -4,7 +4,7 @@ public sealed class Payment
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
 
-    // store smallest currency unit (e.g., cents) to avoid floats
+    // I used `long` to store the smallest currency unit (cents) to avoid `floats`
     public long Amount { get; private set; }
     public string Currency { get; private set; } = "USD";
     public string MerchantRef { get; private set; } = string.Empty;

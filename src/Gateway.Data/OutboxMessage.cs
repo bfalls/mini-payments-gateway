@@ -1,5 +1,12 @@
 ﻿namespace Gateway.Data;
 
+/*
+ Transactional Outbox Pattern.
+ Payments write their intent (Authorize) into the DB in the same transaction.
+ A background worker later reads and dispatches to the PSP, marking Dispatched=true.
+ This eliminates double-charge and lost-request classes of bugs when APIs or
+ networks hiccup, and gives durable, retryable integration points.
+ */
 public sealed class OutboxMessage
 {
     public Guid Id { get; set; } = Guid.NewGuid();

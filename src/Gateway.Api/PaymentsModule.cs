@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Gateway.Api.Modules;
 
+// I'll put in some useful comments soon.
+
 public static class PaymentsModule
 {
     public static IEndpointRouteBuilder MapPaymentsEndpoints(this IEndpointRouteBuilder app)
@@ -17,7 +19,7 @@ public static class PaymentsModule
             var payment = Payment.Create(req.Amount, req.Currency, req.MerchantRef);
             db.Payments.Add(payment);
 
-            // outbox message placeholder (worker uses later)
+            // outbox message placeholder
             db.OutboxMessages.Add(OutboxMessage.ForPaymentAuth(payment.Id, req.SourceToken));
 
             await db.SaveChangesAsync();
