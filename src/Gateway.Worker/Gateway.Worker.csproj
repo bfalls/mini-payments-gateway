@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Gateway.Worker-b728143f-5075-4b42-9be8-ae8b5f2aa44d</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gateway.Domain\Gateway.Domain.csproj" />
+    <ProjectReference Include="..\Gateway.Data\Gateway.Data.csproj" />
+  </ItemGroup>
+</Project>
