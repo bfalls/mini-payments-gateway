@@ -66,15 +66,15 @@ You should see the three tables and a history table.
   ```powershell
   dotnet run --project .\src\PspStub.Api\PspStub.Api.csproj
   ```
-  - Browse to `http://localhost:5279/` to see the PSP is working.
+  - Browse to [http://localhost:5279/](http://localhost:5279/) to see the PSP is working.
 
 5. In terminal 2, start Gateway.Api (payments API) default port is 5023
 ```powershell
 dotnet run --project .\src\Gateway.Api\Gateway.Api.csproj
 ```
-Browse to `http://localhost:5023/health`
+Browse to [http://localhost:5023/health](http://localhost:5023/health)
 
-Browse to `http://localhost:5023/swagger` to see the API docs.
+Browse to [http://localhost:5023/swagger](http://localhost:5023/swagger) to see the API docs.
 
 6. In terminal 3, start Gateway.Worker (background processor)
 
@@ -131,7 +131,8 @@ Gateway.Worker depends on:
   - You should see the same paymentId as before.
   - Note: This is not perfect. 
   For this demo I keyed idempotency on (Idempotency-Key, body-hash) so retries are safe, 
-  but in a real gateway I would probably reject a body change for the same key to avoid silent double-charges.
+  but in a real gateway I would reject a body change for the same key to avoid silent double-charges.
+  The normalized body would be hashed to derive the Idempotency-Key to prevent multiple logically identical requests.
 
 
  
