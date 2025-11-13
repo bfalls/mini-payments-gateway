@@ -2,11 +2,14 @@
 Idempotent payments API with Outbox pattern, worker dispatch, and a PSP stub. Built to demo reliability patterns for high-volume payments.
 
 ## Projects
-- Gateway.Api — Minimal API (+ Swagger)
-- Gateway.Domain — Entities/DTOs
-- Gateway.Data — EF Core DbContext (+ Outbox/Idempotency)
-- Gateway.Worker — Background dispatcher
-- PspStub.Api — Fake PSP for auth/chaos
+
+| Project         | Description                    |
+|------------------|------|
+| Gateway.Api | Minimal API (+ Swagger) |
+| Gateway.Domain | Entities/DTOs |
+| Gateway.Data | EF Core DbContext (+ Outbox/Idempotency) |
+| Gateway.Worker | Background dispatcher |
+| PspStub.Api | Fake Payment Service Provider for auth/testing |
 
 ## Quick start
 dotnet build
@@ -18,11 +21,11 @@ dotnet build
 | Service          | URL | Notes                          |
 |------------------|------|--------------------------------|
 | Postgres        | port 5432<br>Powershell Test:<br> `Test-NetConnection -Port 5432 -ComputerName localhost` | Database  |
-| Gateway.Api     | [http://localhost:5023/health](http://localhost:5023/health)<br>[http://localhost:5023/swagger](http://localhost:5023/swagger)  | Payments API                   |
+| Gateway.Api     | [http://localhost:5023/health](http://localhost:5023/health)<br>[http://localhost:5023/swagger](http://localhost:5023/swagger)  | Payments API  |
 | PspStub.Api     | [http://localhost:5279](http://localhost:5279) | fake Payment Service Provider used for testing  |
+| Gateway.Worker  | N/A  | Background processor. Reads pending outbox messages and calls the PSP to authorize/decline payments. |
 | Gateway.Domain  | N/A  | Library: Domain model layer. Contains business entities (`Payment`, etc.) and domain logic shared across services.  |
 | Gateway.Data   | N/A  | Library: Data access layer. Contains EF Core `GatewayDbContext`, entity mapping, and database migration logic.  |
-| Gateway.Worker  | N/A  | Background processor. Reads pending outbox messages and calls the PSP to authorize/decline payments. |
 
 ### Testing
 These are mostly PowerShell commands.
@@ -112,6 +115,7 @@ Gateway.Worker depends on:
     -Headers @{ "x-api-key" = "local-dev" } |
     Select-Object StatusCode, Content
     ```
+    - You should see the status is now 1 (Authorized) and there is an authCode. This tests that the `Gateway.Worker` is operating.
 
 - To test idempotency, re-run the first request with the same Idempotency-Key:
   ```powershell
