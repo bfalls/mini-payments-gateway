@@ -12,8 +12,22 @@ Idempotent payments API with Outbox pattern, worker dispatch, and a PSP stub. Bu
 dotnet build
 
 ## Let's test it
+
+### Services and ports used
+
+| Service          | URL | Notes                          |
+|------------------|------|--------------------------------|
+| Postgres        | port 5432<br>Powershell Test:<br> `Test-NetConnection -Port 5432 -ComputerName localhost` | Database  |
+| Gateway.Api     | [http://localhost:5023/health](http://localhost:5023/health)<br>[http://localhost:5023/swagger](http://localhost:5023/swagger)  | Payments API                   |
+| PspStub.Api     | [http://localhost:5279](http://localhost:5279) | fake Payment Service Provider used for testing  |
+| Gateway.Domain  | N/A  | Library: Domain model layer. Contains business entities (`Payment`, etc.) and domain logic shared across services.  |
+| Gateway.Data   | N/A  | Library: Data access layer. Contains EF Core `GatewayDbContext`, entity mapping, and database migration logic.  |
+| Gateway.Worker  | N/A  | Background processor. Reads pending outbox messages and calls the PSP to authorize/decline payments. |
+
+### Testing
 These are mostly PowerShell commands.
-1. Run Postgres in Docker:
+
+1. Create and Run Postgres in Docker:
   ```powershell
   docker run --name payments-pg `
   -e POSTGRES_PASSWORD=postgres `
@@ -25,6 +39,11 @@ These are mostly PowerShell commands.
 ```powershell
 docker ps
 ```
+  - If payments-pg already exists then just start it with:
+```powershell
+docker start payments-pg
+```
+
 You should see payments-pg running on port 5432.
 
 2. Create the database schema:
