@@ -1,6 +1,13 @@
 var b = WebApplication.CreateBuilder(args);
+//var urls = Environment.GetEnvironmentVariable("PSP_URLS");
+//if (!string.IsNullOrWhiteSpace(urls))
+//{
+//    b.WebHost.UseUrls(urls);
+//}
+
 var app = b.Build();
 
+app.MapGet("/", () => Results.Ok("PSP stub is running"));
 app.MapPost("/psp/authorize", (AuthRequest req) =>
 {
     if (req.SourceToken.Contains("decline", StringComparison.OrdinalIgnoreCase))

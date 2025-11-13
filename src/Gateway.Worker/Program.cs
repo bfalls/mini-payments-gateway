@@ -1,18 +1,36 @@
 using Gateway.Data;
 using Gateway.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Json;
 
 var b = Host.CreateApplicationBuilder(args);
 
+var pgHost = Environment.GetEnvironmentVariable("WORKER_PG__HOST") ?? "localhost";
+var pgPort = Environment.GetEnvironmentVariable("WORKER_PG__PORT") ?? "5432";
+var pgDb = Environment.GetEnvironmentVariable("WORKER_PG__DATABASE") ?? "gateway";
+var pgUser = Environment.GetEnvironmentVariable("WORKER_PG__USERNAME") ?? "postgres";
+var pgPassword = Environment.GetEnvironmentVariable("WORKER_PG__PASSWORD") ?? "postgres";
+
 // DB (Postgres)
-var cs = b.Configuration.GetConnectionString("Pg");
+var connectionString =
+    $"Host={pgHost};Port={pgPort};Database={pgDb};Username={pgUser};Password={pgPassword}";
+var explicitConnectionString =
+    Environment.GetEnvironmentVariable("WORKER_PG__CONNECTIONSTRING");
+var cs =
+    explicitConnectionString
+    ?? b.Configuration.GetConnectionString("Pg")
+    ?? connectionString;
 b.Services.AddDbContext<GatewayDbContext>(opt => opt.UseNpgsql(cs));
 
 // HTTP client for PSP
+var pspBaseUrl =
+    Environment.GetEnvironmentVariable("WORKER_PSP__BASEURL")
+    ?? b.Configuration["Psp:BaseUrl"]
+    ?? "http://localhost:5279";
 b.Services.AddHttpClient("psp", c =>
 {
-    c.BaseAddress = new Uri(b.Configuration["Psp:BaseUrl"] ?? "http://localhost:5005");
+    c.BaseAddress = new Uri(pspBaseUrl);
 });
 
 // Background worker
@@ -25,14 +43,15 @@ public sealed class OutboxWorker(ILogger<OutboxWorker> log, IServiceProvider sp,
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        var delay = TimeSpan.FromSeconds(cfg.GetValue("Worker:PollIntervalSeconds", 2));
+        var pollSeconds = cfg.GetValue<int?>("Worker:PollIntervalSeconds") ?? 2;
+        var delay = TimeSpan.FromSeconds(pollSeconds);
+        
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 using var scope = sp.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
-
                 var msg = await db.OutboxMessages
                     .Where(o => !o.Dispatched)
                     .OrderBy(o => o.CreatedUtc)
