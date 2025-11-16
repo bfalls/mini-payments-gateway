@@ -1,16 +1,24 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using Gateway.Data;
+using Microsoft.AspNetCore.Http;
+using System.Linq;
 
 namespace Gateway.Api.Middleware;
 
 public sealed class IdempotencyMiddleware(RequestDelegate next)
 {
+    private static readonly PathString[] GuardedPaths =
+    [
+        new PathString("/payments/charge"),
+        new PathString("/payments/crypto-charge")
+    ];
+
     public async Task Invoke(HttpContext ctx, GatewayDbContext db)
     {
-        // Only guard POST /payments/charge
+        // Only guard specific POST /payments/* endpoints
         if (ctx.Request.Method != HttpMethods.Post ||
-            !ctx.Request.Path.StartsWithSegments("/payments/charge"))
+            !GuardedPaths.Any(p => ctx.Request.Path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase)))
         {
             await next(ctx);
             return;

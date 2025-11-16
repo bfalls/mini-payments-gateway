@@ -3,6 +3,8 @@ using Gateway.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Json;
+using System.Linq;
+using System.Text.Json;
 
 var b = Host.CreateApplicationBuilder(args);
 
@@ -71,22 +73,56 @@ public sealed class OutboxWorker(ILogger<OutboxWorker> log, IServiceProvider sp,
                     continue;
                 }
 
-                var http = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("psp");
+                if (string.Equals(msg.Type, "Authorize", StringComparison.OrdinalIgnoreCase))
+                {
+                    var http = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("psp");
 
-                var sourceToken = System.Text.Json.JsonDocument
-                    .Parse(msg.Payload).RootElement.GetProperty("sourceToken").GetString() ?? "";
+                    var sourceToken = JsonDocument
+                        .Parse(msg.Payload).RootElement.GetProperty("sourceToken").GetString() ?? string.Empty;
 
-                var req = new AuthRequest(payment.Id, payment.Amount, payment.Currency, sourceToken);
-                var resp = await http.PostAsJsonAsync("/psp/authorize", req, ct);
-                var body = await resp.Content.ReadFromJsonAsync<AuthResponse>(cancellationToken: ct);
+                    var req = new AuthRequest(payment.Id, payment.Amount, payment.Currency, sourceToken);
+                    var resp = await http.PostAsJsonAsync("/psp/authorize", req, ct);
+                    var body = await resp.Content.ReadFromJsonAsync<AuthResponse>(cancellationToken: ct);
 
-                if (body is { Authorized: true, AuthCode: not null })
-                    payment.MarkAuthorized(body.AuthCode);
-                else if (body is { Authorized: false })
-                    payment.MarkDeclined();
-                else
-                    payment.MarkError();
+                    if (body is { Authorized: true, AuthCode: not null })
+                        payment.MarkAuthorized(body.AuthCode);
+                    else if (body is { Authorized: false })
+                        payment.MarkDeclined();
+                    else
+                        payment.MarkError();
 
+                    msg.Dispatched = true;
+                    await db.SaveChangesAsync(ct);
+                    continue;
+                }
+
+                if (string.Equals(msg.Type, "CryptoConfirm", StringComparison.OrdinalIgnoreCase))
+                {
+                    var root = JsonDocument.Parse(msg.Payload).RootElement;
+                    var txHash = root.TryGetProperty("txHash", out var txProp) ? txProp.GetString() : null;
+
+                    var cryptoTxQuery = db.CryptoTransactions.AsQueryable().Where(c => c.PaymentId == payment.Id);
+                    if (!string.IsNullOrWhiteSpace(txHash))
+                    {
+                        cryptoTxQuery = cryptoTxQuery.Where(c => c.TxHash == txHash);
+                    }
+
+                    var cryptoTx = await cryptoTxQuery.FirstOrDefaultAsync(ct);
+                    if (cryptoTx is null)
+                    {
+                        msg.Dispatched = true;
+                        await db.SaveChangesAsync(ct);
+                        continue;
+                    }
+
+                    cryptoTx.MarkConfirmed(3);
+                    payment.MarkAuthorized(cryptoTx.TxHash);
+                    msg.Dispatched = true;
+                    await db.SaveChangesAsync(ct);
+                    continue;
+                }
+
+                // Unknown types shouldn't block the queue
                 msg.Dispatched = true;
                 await db.SaveChangesAsync(ct);
             }
