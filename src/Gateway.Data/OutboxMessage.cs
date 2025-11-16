@@ -1,4 +1,6 @@
-﻿namespace Gateway.Data;
+using System.Text.Json;
+
+namespace Gateway.Data;
 
 /*
  Transactional Outbox Pattern.
@@ -32,4 +34,13 @@ public sealed class OutboxMessage
             Type = "Authorize",
             Payload = $"{{\"sourceToken\":\"{sourceToken}\"}}"
         };
+
+    public static OutboxMessage ForCryptoConfirm(Guid paymentId, string txHash, string network)
+        => new()
+        {
+            AggregateId = paymentId,
+            Type = "CryptoConfirm",
+            Payload = JsonSerializer.Serialize(new { txHash, network })
+        };
 }
+

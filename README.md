@@ -129,10 +129,55 @@ Gateway.Worker depends on:
   Write-Host ($response2.Content | ConvertFrom-Json | ConvertTo-Json -Depth 5)
   ```
   - You should see the same paymentId as before.
-  - Note: This is not perfect. 
-  For this demo I keyed idempotency on (Idempotency-Key, body-hash) so retries are safe, 
+  - Note: This is not perfect.
+  For this demo I keyed idempotency on (Idempotency-Key, body-hash) so retries are safe,
   but in a real gateway I would reject a body change for the same key to avoid silent double-charges.
   The normalized body would be hashed to derive the Idempotency-Key to prevent multiple logically identical requests.
+
+
+## Blockchain / Crypto Demo Mode
+A lightweight crypto simulation is wired into the same payment/outbox pipeline to show how blockchain-style flows could be modeled without adding real chain dependencies.
+
+1. Submit a crypto charge (reusing the API key and idempotency headers):
+   ```powershell
+   $cryptoCharge = Invoke-WebRequest `
+     -Uri "http://localhost:5023/payments/crypto-charge" `
+     -Method POST `
+     -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = "demo-crypto-1" } `
+     -ContentType "application/json" `
+     -Body '{
+       "amount": 500000,
+       "cryptoCurrency": "USDC",
+       "network": "Ethereum-Testnet",
+       "fromWallet": "0xCafeFood00000000000000000000000000000000",
+       "merchantRef": "order-crypto-42"
+     }'
+   Write-Host "Crypto charge response:" -ForegroundColor Cyan
+   Write-Host ($cryptoCharge.Content | ConvertFrom-Json | ConvertTo-Json -Depth 5)
+   ```
+   The API stores a normal `Payment`, creates a `CryptoTransaction` row in `Pending`, and enqueues a `CryptoConfirm` outbox message. The response includes the generated `txHash` so you can track it.
+
+2. Let the worker pick up the new outbox entry. Instead of calling the PSP stub, the worker simulates chain confirmations by marking the crypto transaction confirmed (3 confirmations) and authorizing the payment with the `txHash` as the auth code.
+
+3. Poll the payment or its crypto transaction record:
+   ```powershell
+   $paymentId = ($cryptoCharge.Content | ConvertFrom-Json).paymentId
+   Write-Host "Get Payment" -ForegroundColor Cyan
+   $resp = Invoke-WebRequest `
+   -Uri "http://localhost:5023/payments/$paymentId" `
+   -Headers @{ "x-api-key" = "local-dev" }
+   Write-Host "StatusCode: $($resp.StatusCode)"
+   ($resp.Content | ConvertFrom-Json) | ConvertTo-Json -Depth 10
+   Write-Host "Get Crypto Transaction" -ForegroundColor Cyan
+   $resp = Invoke-WebRequest `
+   -Uri "http://localhost:5023/payments/$paymentId/crypto" `
+   -Headers @{ "x-api-key" = "local-dev" }
+   Write-Host "StatusCode: $($resp.StatusCode)"
+   ($resp.Content | ConvertFrom-Json) | ConvertTo-Json -Depth 10
+   ```
+   The crypto endpoint returns network, wallet, confirmations, and timestamps for the simulated transaction.
+
+All crypto charge requests are idempotent just like card charges—the `IdempotencyMiddleware` now protects both `/payments/charge` and `/payments/crypto-charge`.
 
 
  
