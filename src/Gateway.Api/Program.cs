@@ -40,9 +40,12 @@ if (app.Configuration.GetValue<bool>("AutoMigrate") || app.Environment.IsDevelop
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapGet("/health", () => Results.Ok(new { ok = true }));
 
-// Idempotency guard wraps POST /payments/charge
+// Idempotency guard wraps POST /payments/*
 app.UseMiddleware<IdempotencyMiddleware>();
 
 // Payments endpoints

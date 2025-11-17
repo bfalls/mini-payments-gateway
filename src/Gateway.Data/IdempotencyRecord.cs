@@ -2,10 +2,10 @@
 
 public sealed class IdempotencyRecord
 {
-    // Client-supplied header value: Idempotency-Key
+    // Derived, canonicalized idempotency key (SHA-256 of normalized payload)
     public string Key { get; set; } = string.Empty;
 
-    // SHA-256 of the request body (hex)
+    // Duplicate column kept for existing schema; stores the same derived hash
     public string BodyHash { get; set; } = string.Empty;
 
     // Canonical response to replay on duplicates

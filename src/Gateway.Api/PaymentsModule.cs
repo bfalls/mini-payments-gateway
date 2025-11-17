@@ -1,4 +1,5 @@
-﻿using Gateway.Data;
+using Gateway.Api.Idempotency;
+using Gateway.Data;
 using Gateway.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,8 @@ public static class PaymentsModule
             if (http.Request.Headers["x-api-key"] != http.RequestServices.GetRequiredService<IConfiguration>()["ApiKey"])
                 return Results.Unauthorized();
 
+            var (derivedKey, canonicalJson) = IdempotencyKeyDeriver.FromChargeRequest(req);
+
             var payment = Payment.Create(req.Amount, req.Currency, req.MerchantRef);
             db.Payments.Add(payment);
 
@@ -24,7 +27,13 @@ public static class PaymentsModule
 
             await db.SaveChangesAsync();
             return Results.Accepted($"/payments/{payment.Id}",
-                new { paymentId = payment.Id, status = payment.Status.ToString() });
+                new
+                {
+                    paymentId = payment.Id,
+                    status = payment.Status.ToString(),
+                    derivedIdempotencyKey = derivedKey,
+                    canonicalPayload = canonicalJson
+                });
         })
         .WithName("ChargePayment");
 
@@ -33,6 +42,8 @@ public static class PaymentsModule
         {
             if (http.Request.Headers["x-api-key"] != http.RequestServices.GetRequiredService<IConfiguration>()["ApiKey"])
                 return Results.Unauthorized();
+
+            var (derivedKey, canonicalJson) = IdempotencyKeyDeriver.FromCryptoChargeRequest(req);
 
             var currency = $"CRYPTO-{req.CryptoCurrency}";
             var payment = Payment.Create(req.Amount, currency, req.MerchantRef);
@@ -45,7 +56,15 @@ public static class PaymentsModule
 
             await db.SaveChangesAsync();
             return Results.Accepted($"/payments/{payment.Id}",
-                new { paymentId = payment.Id, status = payment.Status.ToString(), txHash, network = req.Network });
+                new
+                {
+                    paymentId = payment.Id,
+                    status = payment.Status.ToString(),
+                    txHash,
+                    network = req.Network,
+                    derivedIdempotencyKey = derivedKey,
+                    canonicalPayload = canonicalJson
+                });
         })
         .WithName("CryptoChargePayment");
 
@@ -77,6 +96,26 @@ public static class PaymentsModule
             return Results.Ok(view);
         })
         .WithName("GetCryptoTransaction");
+
+        app.MapPost("/tools/derive-idempotency/charge", (ChargeRequest req, HttpContext http) =>
+        {
+            if (http.Request.Headers["x-api-key"] != http.RequestServices.GetRequiredService<IConfiguration>()["ApiKey"])
+                return Results.Unauthorized();
+
+            var (derivedKey, canonicalJson) = IdempotencyKeyDeriver.FromChargeRequest(req);
+            return Results.Ok(new { derivedKey, canonicalPayload = canonicalJson });
+        })
+        .WithName("DeriveChargeIdempotencyKey");
+
+        app.MapPost("/tools/derive-idempotency/crypto-charge", (CryptoChargeRequest req, HttpContext http) =>
+        {
+            if (http.Request.Headers["x-api-key"] != http.RequestServices.GetRequiredService<IConfiguration>()["ApiKey"])
+                return Results.Unauthorized();
+
+            var (derivedKey, canonicalJson) = IdempotencyKeyDeriver.FromCryptoChargeRequest(req);
+            return Results.Ok(new { derivedKey, canonicalPayload = canonicalJson });
+        })
+        .WithName("DeriveCryptoChargeIdempotencyKey");
 
         return app;
     }
