@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: gateway-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gateway
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gateway || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    # Optional: expose Postgres to your host for debugging
+    # ports:
+    #   - "5432:5432"
+
+  psp-stub-api:
+    build:
+      context: .
+      dockerfile: src/PspStub.Api/Dockerfile
+    container_name: psp-stub-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://0.0.0.0:8080"
+    depends_on:
+      - postgres
+
+  gateway-api:
+    build:
+      context: .
+      dockerfile: src/Gateway.Api/Dockerfile
+    container_name: gateway-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://0.0.0.0:8080"
+      AutoMigrate: "true"
+      # Use the Postgres service from this compose file
+      ConnectionStrings__Pg: "Host=postgres;Port=5432;Database=gateway;Username=postgres;Password=postgres"
+      # Override your PSP base URL to point at the stub service in Docker
+      Psp__BaseUrl: "http://psp-stub-api:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      psp-stub-api:
+        condition: service_started
+    ports:
+      # Public entrypoint: http://localhost/ (or EC2 public IP)
+      - "80:8080"
+
+  gateway-worker:
+    build:
+      context: .
+      dockerfile: src/Gateway.Worker/Dockerfile
+    container_name: gateway-worker
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: "Production"
+      ConnectionStrings__Pg: "Host=postgres;Port=5432;Database=gateway;Username=postgres;Password=postgres"
+      Psp__BaseUrl: "http://psp-stub-api:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      psp-stub-api:
+        condition: service_started
+volumes:
+  pgdata:
