@@ -10,8 +10,7 @@ var b = WebApplication.CreateBuilder(args);
 //  - UseInMemoryDb=true is set (env var or config), OR
 //  - there is no Pg connection string configured.
 var useInMemory = b.Configuration.GetValue<bool>("UseInMemoryDb")
-                  || string.IsNullOrWhiteSpace(
-b.Configuration.GetConnectionString("Pg"));
+                  || string.IsNullOrWhiteSpace(b.Configuration.GetConnectionString("Pg"));
 
 if (useInMemory)
 {
