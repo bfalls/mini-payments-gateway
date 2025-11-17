@@ -204,5 +204,12 @@ A lightweight crypto simulation is wired into the same payment/outbox pipeline t
 
 All crypto charge requests are idempotent just like card charges—the `IdempotencyMiddleware` now protects both `/payments/charge` and `/payments/crypto-charge`.
 
+## Database configuration (Postgres vs InMemory)
+
+The gateway API can run against either a real PostgreSQL database or the EF Core
+InMemory provider. This makes it easy to run the demo locally with Dockerized
+Postgres while allowing CI to run without a real database.
+
+
 
  
