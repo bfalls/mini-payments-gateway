@@ -46,12 +46,12 @@
     <div class="card">
         <div class="section-title">
             <h2>Environment</h2>
-            <small>Defaults assume local dev: http://localhost:5023 with apiKey <code>local-dev</code></small>
+            <small>Defaults use the page origin (e.g., http://localhost:5023 in dev) with apiKey <code>local-dev</code></small>
         </div>
         <div class="grid">
             <div>
                 <label for="baseUrl">Gateway base URL</label>
-                <input id="baseUrl" value="http://localhost:5023" />
+                <input id="baseUrl" />
             </div>
             <div>
                 <label for="apiKey">API key header (x-api-key)</label>
@@ -149,6 +149,13 @@
     </div>
 </main>
 <script>
+
+// Initialize base URL from the page origin so this works in dev, Docker, and on EC2.
+const baseUrlInput = document.getElementById('baseUrl');
+if (baseUrlInput && !baseUrlInput.value) {
+    baseUrlInput.value = window.location.origin;
+}
+
 async function postJson(url, payload, apiKey, idempotencyKey) {
     const headers = {
         'Content-Type': 'application/json',
