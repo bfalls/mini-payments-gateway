@@ -14,6 +14,9 @@ Idempotent payments API with Outbox pattern, worker dispatch, and a PSP stub. Bu
 ## Quick start
 dotnet build
 
+## PrivateCircle demo UI
+- Run `Gateway.Api` and browse to [http://localhost:5023](http://localhost:5023) to use the built-in PrivateCircle-branded page. It can derive idempotency keys for fiat and crypto payloads, submit payments, and show canonical payloads used by the middleware.
+
 ## Let's test it
 
 ### Services and ports used
@@ -85,65 +88,78 @@ Gateway.Worker depends on:
   dotnet run --project .\src\Gateway.Worker\Gateway.Worker.csproj
   ```
 
-7. In PowerShell terminal 4, run the test
-- Create the request and query the payment status immediately:
+7. In PowerShell terminal 4, run the test with derived idempotency keys (no more hard-coded demo keys)
+- First, ask the API to derive the canonical payload + key that the middleware uses:
+  ```powershell
+  $derive = Invoke-WebRequest `
+    -Uri "http://localhost:5023/tools/derive-idempotency/charge" `
+    -Method POST `
+    -Headers @{ "x-api-key" = "local-dev" } `
+    -ContentType "application/json" `
+    -Body '{ "amount":4200,"currency":"USD","sourceToken":"tok_visa","merchantRef":"order-1001" }'
+
+  $derivedKey = ($derive.Content | ConvertFrom-Json).derivedKey
+  Write-Host "Derived key:" $derivedKey -ForegroundColor Cyan
+  ```
+
+- Create the request using that derived key (the server re-computes it and rejects mismatches):
   ```powershell
   $response = Invoke-WebRequest `
     -Uri "http://localhost:5023/payments/charge" `
     -Method POST `
-    -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = "abc-123" } `
+    -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = $derivedKey } `
     -ContentType "application/json" `
     -Body '{ "amount":4200,"currency":"USD","sourceToken":"tok_visa","merchantRef":"order-1001" }'
-
-  Write-Host "Response:" -ForegroundColor Cyan
-  Write-Host ($response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 5)
 
   $data = $response.Content | ConvertFrom-Json
   $paymentId = $data.paymentId
-
-  Invoke-WebRequest `
-  -Uri "http://localhost:5023/payments/$paymentId" `
-  -Headers @{ "x-api-key" = "local-dev" } |
-  Select-Object StatusCode, Content
+  Write-Host ($data | ConvertTo-Json -Depth 5)
   ```
-  - See that the status is zero (Pending) and there is no authCode.
-
-- Wait a few seconds for the worker to process the outbox and call the PSP. Query the same payment again.
+- Immediately check status (expect Pending) and then after a few seconds check again (should be Authorized with an authCode):
     ```powershell
     Invoke-WebRequest `
-    -Uri "http://localhost:5023/payments/$paymentId" `
-    -Headers @{ "x-api-key" = "local-dev" } |
+      -Uri "http://localhost:5023/payments/$paymentId" `
+      -Headers @{ "x-api-key" = "local-dev" } |
     Select-Object StatusCode, Content
     ```
-    - You should see the status is now 1 (Authorized) and there is an authCode. This tests that the `Gateway.Worker` is operating.
 
-- To test idempotency, re-run the first request with the same Idempotency-Key:
+- To prove idempotency, repeat the charge with the **same body** and **same derived key**. You should receive the exact same paymentId and payload because the middleware replays the stored response for the canonical hash:
   ```powershell
-  $response2 = Invoke-WebRequest `
+  $resp = Invoke-WebRequest `
     -Uri "http://localhost:5023/payments/charge" `
     -Method POST `
-    -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = "abc-123" } `
+    -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = $derivedKey } `
     -ContentType "application/json" `
     -Body '{ "amount":4200,"currency":"USD","sourceToken":"tok_visa","merchantRef":"order-1001" }'
-  Write-Host "Idempotent Response:" -ForegroundColor Cyan
-  Write-Host ($response2.Content | ConvertFrom-Json | ConvertTo-Json -Depth 5)
+   Write-Host "StatusCode: $($resp.StatusCode)"
+   ($resp.Content | ConvertFrom-Json) | ConvertTo-Json -Depth 10  
   ```
-  - You should see the same paymentId as before.
-  - Note: This is not perfect.
-  For this demo I keyed idempotency on (Idempotency-Key, body-hash) so retries are safe,
-  but in a real gateway I would reject a body change for the same key to avoid silent double-charges.
-  The normalized body would be hashed to derive the Idempotency-Key to prevent multiple logically identical requests.
 
 
 ## Blockchain / Crypto Demo Mode
 A lightweight crypto simulation is wired into the same payment/outbox pipeline to show how blockchain-style flows could be modeled without adding real chain dependencies.
 
-1. Submit a crypto charge (reusing the API key and idempotency headers):
+1. Submit a crypto charge (derive the key first):
    ```powershell
+   $cryptoDerive = Invoke-WebRequest `
+     -Uri "http://localhost:5023/tools/derive-idempotency/crypto-charge" `
+     -Method POST `
+     -Headers @{ "x-api-key" = "local-dev" } `
+     -ContentType "application/json" `
+     -Body '{
+       "amount": 500000,
+       "cryptoCurrency": "USDC",
+       "network": "Ethereum-Testnet",
+       "fromWallet": "0xCafeFood00000000000000000000000000000000",
+       "merchantRef": "order-crypto-42"
+     }'
+   $cryptoKey = ($cryptoDerive.Content | ConvertFrom-Json).derivedKey
+   Write-Host "Derived crypto key:" $cryptoKey -ForegroundColor Cyan
+
    $cryptoCharge = Invoke-WebRequest `
      -Uri "http://localhost:5023/payments/crypto-charge" `
      -Method POST `
-     -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = "demo-crypto-1" } `
+     -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = $cryptoKey } `
      -ContentType "application/json" `
      -Body '{
        "amount": 500000,

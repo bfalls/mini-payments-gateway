@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PrivateCircle Pay Demo</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="brand">
+            <div class="logo" aria-label="PrivateCircle logo">
+                <svg width="600"
+                     height="220"
+                     viewBox="0 0 600 220"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="ringGradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#FF3B30" />
+                            <stop offset="50%" stop-color="#C039FF" />
+                            <stop offset="100%" stop-color="#007AFF" />
+                        </linearGradient>
+                    </defs>
+                    <circle cx="110"
+                            cy="110"
+                            r="80"
+                            fill="none"
+                            stroke="url(#ringGradient)"
+                            stroke-width="22" />
+                    <text x="210"
+                          y="124"
+                          fill="#000000"
+                          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif"
+                          font-size="52"
+                          font-weight="600">
+                        PrivateCircle
+                    </text>
+                </svg>
+            </div>
+            <div>
+                <div>PrivateCircle Pay Demo</div>
+                <small>Fiat + Crypto • Derived idempotency keys • Worker updates</small>
+            </div>
+        </div>
+        <div class="badge">Ready to demo</div>
+    </header>
+<main class="main">
+    <div class="card">
+        <div class="section-title">
+            <h2>Environment</h2>
+            <small>Defaults assume local dev: http://localhost:5023 with apiKey <code>local-dev</code></small>
+        </div>
+        <div class="grid">
+            <div>
+                <label for="baseUrl">Gateway base URL</label>
+                <input id="baseUrl" value="http://localhost:5023" />
+            </div>
+            <div>
+                <label for="apiKey">API key header (x-api-key)</label>
+                <input id="apiKey" value="local-dev" />
+            </div>
+        </div>
+        <div class="callout">
+            This UI derives the idempotency key on the server using the same canonicalization logic that protects
+            <code>/payments/charge</code> and <code>/payments/crypto-charge</code>. Use "Derive key" to see the value before sending a payment.
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="section-title">
+                <h3>Card / Fiat</h3>
+                <span class="badge">Idempotent</span>
+            </div>
+            <label for="fiatAmount">Amount (minor units)</label>
+            <input id="fiatAmount" type="number" value="4200" />
+
+            <label for="fiatCurrency">Currency</label>
+            <input id="fiatCurrency" value="USD" />
+
+            <label for="fiatToken">Source token</label>
+            <input id="fiatToken" value="tok_visa" />
+
+            <label for="fiatMerchantRef">Merchant ref</label>
+            <input id="fiatMerchantRef" value="order-1001" />
+
+            <button id="fiatDerive">Derive key</button>
+            <button class="secondary" id="fiatSubmit">Submit payment</button>
+
+            <label for="fiatDerived">Derived key</label>
+            <input id="fiatDerived" readonly />
+
+            <label for="fiatCanonical">Canonical payload</label>
+            <textarea id="fiatCanonical" readonly></textarea>
+
+            <div class="status" id="fiatStatus">Awaiting request...</div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <h3>Crypto</h3>
+                <span class="badge">Simulated chain confirmations</span>
+            </div>
+            <label for="cryptoAmount">Amount (minor units)</label>
+            <input id="cryptoAmount" type="number" value="500000" />
+
+            <label for="cryptoCurrency">Crypto currency</label>
+            <input id="cryptoCurrency" value="USDC" />
+
+            <label for="cryptoNetwork">Network</label>
+            <input id="cryptoNetwork" value="Ethereum-Testnet" />
+
+            <label for="cryptoFromWallet">From wallet</label>
+            <input id="cryptoFromWallet" value="0xCafeFood00000000000000000000000000000000" />
+
+            <label for="cryptoMerchantRef">Merchant ref</label>
+            <input id="cryptoMerchantRef" value="order-crypto-42" />
+
+            <button id="cryptoDerive">Derive key</button>
+            <button class="secondary" id="cryptoSubmit">Submit crypto</button>
+
+            <label for="cryptoDerived">Derived key</label>
+            <input id="cryptoDerived" readonly />
+
+            <label for="cryptoCanonical">Canonical payload</label>
+            <textarea id="cryptoCanonical" readonly></textarea>
+
+            <div class="status" id="cryptoStatus">Awaiting request...</div>
+        </div>
+    </div>
+</main>
+<script>
+async function postJson(url, payload, apiKey, idempotencyKey) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey
+    };
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const body = isJson ? await response.json() : await response.text();
+    return { status: response.status, body };
+}
+
+function buildFiatPayload() {
+    return {
+        amount: Number(document.getElementById('fiatAmount').value),
+        currency: document.getElementById('fiatCurrency').value,
+        sourceToken: document.getElementById('fiatToken').value,
+        merchantRef: document.getElementById('fiatMerchantRef').value
+    };
+}
+
+function buildCryptoPayload() {
+    return {
+        amount: Number(document.getElementById('cryptoAmount').value),
+        cryptoCurrency: document.getElementById('cryptoCurrency').value,
+        network: document.getElementById('cryptoNetwork').value,
+        fromWallet: document.getElementById('cryptoFromWallet').value,
+        merchantRef: document.getElementById('cryptoMerchantRef').value
+    };
+}
+
+function writeStatus(elementId, data) {
+    const el = document.getElementById(elementId);
+    el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+async function derive(flow) {
+    const baseUrl = document.getElementById('baseUrl').value;
+    const apiKey = document.getElementById('apiKey').value;
+    const payload = flow === 'fiat' ? buildFiatPayload() : buildCryptoPayload();
+    const url = `${baseUrl}/tools/derive-idempotency/${flow === 'fiat' ? 'charge' : 'crypto-charge'}`;
+    const result = await postJson(url, payload, apiKey);
+    if (flow === 'fiat') {
+        document.getElementById('fiatDerived').value = result.body.derivedKey || '';
+        document.getElementById('fiatCanonical').value = result.body.canonicalPayload || '';
+        writeStatus('fiatStatus', result);
+    } else {
+        document.getElementById('cryptoDerived').value = result.body.derivedKey || '';
+        document.getElementById('cryptoCanonical').value = result.body.canonicalPayload || '';
+        writeStatus('cryptoStatus', result);
+    }
+}
+
+async function submit(flow) {
+    const baseUrl = document.getElementById('baseUrl').value;
+    const apiKey = document.getElementById('apiKey').value;
+    const payload = flow === 'fiat' ? buildFiatPayload() : buildCryptoPayload();
+    const derived = flow === 'fiat' ? document.getElementById('fiatDerived').value : document.getElementById('cryptoDerived').value;
+    const url = `${baseUrl}/payments/${flow === 'fiat' ? 'charge' : 'crypto-charge'}`;
+    const result = await postJson(url, payload, apiKey, derived);
+    if (flow === 'fiat') {
+        writeStatus('fiatStatus', result);
+    } else {
+        writeStatus('cryptoStatus', result);
+    }
+}
+
+document.getElementById('fiatDerive').addEventListener('click', () => derive('fiat'));
+document.getElementById('cryptoDerive').addEventListener('click', () => derive('crypto'));
+document.getElementById('fiatSubmit').addEventListener('click', () => submit('fiat'));
+document.getElementById('cryptoSubmit').addEventListener('click', () => submit('crypto'));
+</script>
+</body>
+</html>

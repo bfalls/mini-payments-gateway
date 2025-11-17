@@ -1,7 +1,7 @@
-using System.Security.Cryptography;
-using System.Text;
+using Gateway.Api.Idempotency;
 using Gateway.Data;
 using Microsoft.AspNetCore.Http;
+using System.IO;
 using System.Linq;
 
 namespace Gateway.Api.Middleware;
@@ -24,24 +24,29 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
             return;
         }
 
-        var key = ctx.Request.Headers["Idempotency-Key"].ToString();
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await ctx.Response.WriteAsync("Missing Idempotency-Key");
-            return;
-        }
-
         // Read body (and reset stream so the endpoint can read it too)
         ctx.Request.EnableBuffering();
-        using var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(ctx.Request.Body, leaveOpen: true);
         var body = await reader.ReadToEndAsync();
         ctx.Request.Body.Position = 0;
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
+        if (!IdempotencyKeyDeriver.TryDerive(ctx.Request.Path, body, out var derivedKey, out _))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await ctx.Response.WriteAsync("Unable to derive idempotency key for this request.");
+            return;
+        }
 
-        // If we’ve seen this key+body, short-circuit with the canonical response
-        var existing = await db.IdempotencyRecords.FindAsync(key, hash);
+        var clientKey = ctx.Request.Headers["Idempotency-Key"].ToString();
+        if (!string.IsNullOrWhiteSpace(clientKey) && !string.Equals(clientKey, derivedKey, StringComparison.Ordinal))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await ctx.Response.WriteAsync("Idempotency-Key header does not match the derived key for this payload.");
+            return;
+        }
+
+        // If we’ve seen this derived key, short-circuit with the canonical response
+        var existing = await db.IdempotencyRecords.FindAsync(derivedKey, derivedKey);
         if (existing is not null)
         {
             ctx.Response.StatusCode = existing.StatusCode;
@@ -64,7 +69,7 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
         await buffer.CopyToAsync(original);
         ctx.Response.Body = original;
 
-        db.IdempotencyRecords.Add(new IdempotencyRecord(key, hash, ctx.Response.StatusCode, responseBody));
+        db.IdempotencyRecords.Add(new IdempotencyRecord(derivedKey, derivedKey, ctx.Response.StatusCode, responseBody));
         await db.SaveChangesAsync();
     }
 }
