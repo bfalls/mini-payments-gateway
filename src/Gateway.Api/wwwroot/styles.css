@@ -18,7 +18,7 @@ body {
 }
 
 .header {
-    background: linear-gradient(135deg, var(--pc-primary), #10233a);
+    background: linear-gradient(135deg, #ff6b6b, #7A0000);
     color: white;
     padding: 28px;
     display: flex;
@@ -49,6 +49,12 @@ body {
 
 .header small {
     color: #d7e3f7;
+}
+
+.logo svg {
+    width: 320px;
+    height: auto;
+    display: block;
 }
 
 .main {

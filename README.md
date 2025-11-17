@@ -125,13 +125,14 @@ Gateway.Worker depends on:
 
 - To prove idempotency, repeat the charge with the **same body** and **same derived key**. You should receive the exact same paymentId and payload because the middleware replays the stored response for the canonical hash:
   ```powershell
-  Invoke-WebRequest `
+  $resp = Invoke-WebRequest `
     -Uri "http://localhost:5023/payments/charge" `
     -Method POST `
     -Headers @{ "x-api-key" = "local-dev"; "Idempotency-Key" = $derivedKey } `
     -ContentType "application/json" `
     -Body '{ "amount":4200,"currency":"USD","sourceToken":"tok_visa","merchantRef":"order-1001" }'
-  | Select-Object StatusCode, Content
+   Write-Host "StatusCode: $($resp.StatusCode)"
+   ($resp.Content | ConvertFrom-Json) | ConvertTo-Json -Depth 10  
   ```
 
 
@@ -153,6 +154,7 @@ A lightweight crypto simulation is wired into the same payment/outbox pipeline t
        "merchantRef": "order-crypto-42"
      }'
    $cryptoKey = ($cryptoDerive.Content | ConvertFrom-Json).derivedKey
+   Write-Host "Derived crypto key:" $cryptoKey -ForegroundColor Cyan
 
    $cryptoCharge = Invoke-WebRequest `
      -Uri "http://localhost:5023/payments/crypto-charge" `
