@@ -41,7 +41,6 @@
                 <small>Fiat + Crypto • Derived idempotency keys • Worker updates</small>
             </div>
         </div>
-        <div class="badge">Ready to demo</div>
     </header>
 <main class="main">
     <div class="card">
@@ -69,7 +68,7 @@
         <div class="card">
             <div class="section-title">
                 <h3>Card / Fiat</h3>
-                <span class="badge">Idempotent</span>
+                <span class="badge">Simulated card authorization</span>
             </div>
             <label for="fiatAmount">Amount (minor units)</label>
             <input id="fiatAmount" type="number" value="4200" />
@@ -92,7 +91,16 @@
             <label for="fiatCanonical">Canonical payload</label>
             <textarea id="fiatCanonical" readonly></textarea>
 
-            <div class="status" id="fiatStatus">Awaiting request...</div>
+            <div class="status" id="fiatStatus">Make a request above...</div>
+
+            <div class="section-title">
+                <h4>Track worker updates</h4>
+                <small>Use the last response or paste a paymentId to query the API from here.</small>
+            </div>
+            <label for="fiatPaymentId">Payment ID</label>
+            <input id="fiatPaymentId" placeholder="Filled after Submit payment" />
+            <button class="secondary" id="fiatFetch">Fetch /payments/{paymentId}</button>
+            <div class="status" id="fiatFetchStatus">No fetch yet.</div>
         </div>
 
         <div class="card">
@@ -124,7 +132,19 @@
             <label for="cryptoCanonical">Canonical payload</label>
             <textarea id="cryptoCanonical" readonly></textarea>
 
-            <div class="status" id="cryptoStatus">Awaiting request...</div>
+            <div class="status" id="cryptoStatus">Make a request above...</div>
+
+            <div class="section-title">
+                <h4>Track worker updates</h4>
+                <small>Call the payment and crypto endpoints without leaving the demo.</small>
+            </div>
+            <label for="cryptoPaymentId">Payment ID</label>
+            <input id="cryptoPaymentId" placeholder="Filled after Submit crypto" />
+            <div class="grid">
+                <button class="secondary" id="cryptoFetchPayment">Fetch /payments/{paymentId}</button>
+                <button class="secondary" id="cryptoFetchTx">Fetch /payments/{paymentId}/crypto</button>
+            </div>
+            <div class="status" id="cryptoFetchStatus">No fetch yet.</div>
         </div>
     </div>
 </main>
@@ -140,6 +160,17 @@ async function postJson(url, payload, apiKey, idempotencyKey) {
         method: 'POST',
         headers,
         body: JSON.stringify(payload)
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const body = isJson ? await response.json() : await response.text();
+    return { status: response.status, body };
+}
+
+async function getJson(url, apiKey) {
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'x-api-key': apiKey }
     });
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
@@ -197,15 +228,50 @@ async function submit(flow) {
     const result = await postJson(url, payload, apiKey, derived);
     if (flow === 'fiat') {
         writeStatus('fiatStatus', result);
+        if (result.body && result.body.paymentId) {
+            document.getElementById('fiatPaymentId').value = result.body.paymentId;
+        }
     } else {
         writeStatus('cryptoStatus', result);
+        if (result.body && result.body.paymentId) {
+            document.getElementById('cryptoPaymentId').value = result.body.paymentId;
+        }
     }
+}
+
+async function fetchPaymentStatus(flow) {
+    const baseUrl = document.getElementById('baseUrl').value;
+    const apiKey = document.getElementById('apiKey').value;
+    const paymentId = (flow === 'fiat' ? document.getElementById('fiatPaymentId') : document.getElementById('cryptoPaymentId')).value.trim();
+    if (!paymentId) {
+        writeStatus(flow === 'fiat' ? 'fiatFetchStatus' : 'cryptoFetchStatus', 'Enter or submit a payment to get an id.');
+        return;
+    }
+
+    const result = await getJson(`${baseUrl}/payments/${paymentId}`, apiKey);
+    writeStatus(flow === 'fiat' ? 'fiatFetchStatus' : 'cryptoFetchStatus', result);
+}
+
+async function fetchCryptoTx() {
+    const baseUrl = document.getElementById('baseUrl').value;
+    const apiKey = document.getElementById('apiKey').value;
+    const paymentId = document.getElementById('cryptoPaymentId').value.trim();
+    if (!paymentId) {
+        writeStatus('cryptoFetchStatus', 'Enter or submit a crypto payment to get an id.');
+        return;
+    }
+
+    const result = await getJson(`${baseUrl}/payments/${paymentId}/crypto`, apiKey);
+    writeStatus('cryptoFetchStatus', result);
 }
 
 document.getElementById('fiatDerive').addEventListener('click', () => derive('fiat'));
 document.getElementById('cryptoDerive').addEventListener('click', () => derive('crypto'));
 document.getElementById('fiatSubmit').addEventListener('click', () => submit('fiat'));
 document.getElementById('cryptoSubmit').addEventListener('click', () => submit('crypto'));
+document.getElementById('fiatFetch').addEventListener('click', () => fetchPaymentStatus('fiat'));
+document.getElementById('cryptoFetchPayment').addEventListener('click', () => fetchPaymentStatus('crypto'));
+document.getElementById('cryptoFetchTx').addEventListener('click', fetchCryptoTx);
 </script>
 </body>
 </html>

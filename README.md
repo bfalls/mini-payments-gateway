@@ -17,6 +17,15 @@ dotnet build
 ## PrivateCircle demo UI
 - Run `Gateway.Api` and browse to [http://localhost:5023](http://localhost:5023) to use the built-in PrivateCircle-branded page. It can derive idempotency keys for fiat and crypto payloads, submit payments, and show canonical payloads used by the middleware.
 
+### Online demo: worker updates for fiat + crypto
+Use the built-in UI at http://localhost:5023 to show the background worker updating payment records after the simulated PSP/chain responds.
+
+1. Start **PspStub.Api**, **Gateway.Api**, and **Gateway.Worker** (see steps below). Keep the demo UI open in a browser.
+2. In the **Card / Fiat** card, click **Derive key** to populate the derived key and canonical payload, then click **Submit payment**. The UI displays the initial `Pending` response and fills the **Payment ID** field.
+3. Click **Fetch /payments/{paymentId}** to query the API from inside the demo. As the worker authorizes the payment, repeat the fetch to watch the status move to `Authorized` with an `authCode` from the PSP stub.
+4. Repeat the flow in the **Crypto** card. After **Submit crypto**, use **Fetch /payments/{paymentId}** and **Fetch /payments/{paymentId}/crypto** to watch the worker mark the transaction with confirmations and authorize the payment using the simulated `txHash`.
+5. Call either submit button with the same derived key to highlight that the stored response is replayed (idempotent behavior still works after the worker updates records).
+ 
 ## Let's test it
 
 ### Services and ports used
