@@ -5,12 +5,22 @@ using Microsoft.EntityFrameworkCore;
 
 var b = WebApplication.CreateBuilder(args);
 
-// Postgres
-var cs = b.Configuration.GetConnectionString("Pg");
-b.Services.AddDbContext<GatewayDbContext>(opt => opt.UseNpgsql(cs));
+// Database configuration: choose between Postgres and EF Core InMemory.
+// InMemory is used when:
+//  - UseInMemoryDb=true is set (env var or config), OR
+//  - there is no Pg connection string configured.
+var useInMemory = b.Configuration.GetValue<bool>("UseInMemoryDb")
+                  || string.IsNullOrWhiteSpace(b.Configuration.GetConnectionString("Pg"));
 
-// EF Core - InMemory provider for quick local runs
-//b.Services.AddDbContext<GatewayDbContext>(opt => opt.UseInMemoryDatabase("payments"));
+if (useInMemory)
+{
+    b.Services.AddDbContext<GatewayDbContext>(opt => opt.UseInMemoryDatabase("payments"));
+}
+else
+{
+    var cs = b.Configuration.GetConnectionString("Pg");
+    b.Services.AddDbContext<GatewayDbContext>(opt => opt.UseNpgsql(cs));
+}
 
 // Swagger
 b.Services.AddEndpointsApiExplorer();
