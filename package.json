@@ -1,0 +1,24 @@
+{
+  "name": "mini-payments-gateway",
+  "version": "1.0.0",
+  "description": "Idempotent payments API with Outbox pattern, worker dispatch, and a PSP stub. Built to demo reliability patterns for high-volume payments.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bfalls/mini-payments-gateway.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/bfalls/mini-payments-gateway/issues"
+  },
+  "homepage": "https://github.com/bfalls/mini-payments-gateway#readme",
+  "devDependencies": {
+    "gulp": "^5.0.1"
+  }
+}
