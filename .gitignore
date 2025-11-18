@@ -2,6 +2,8 @@
 bin/
 obj/
 *.user
+*.pem
+*.ppk
 *.suo
 *.userprefs
 TestResult*
