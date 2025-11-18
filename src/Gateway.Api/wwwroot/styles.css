@@ -114,8 +114,6 @@ button:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(36,59,90
     border-radius: 12px;
     padding: 12px;
     font-family: Consolas, monospace;
-    white-space: pre-wrap;
-    min-height: 120px;
 }
 
 .badge {

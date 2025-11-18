@@ -42,6 +42,15 @@ Use the built-in UI at http://localhost:5023 to show the background worker updat
 ### Testing
 These are mostly PowerShell commands.
 
+#### Just use `docker compose`
+This will build and launch the service in one command. Postgres will download and launch as part of this too.
+```powershell
+docker compose up --build
+```
+Use Ctrl-C to stop it.
+
+#### Or run it manually (each service manually)
+
 1. Create and Run Postgres in Docker:
   ```powershell
   docker run --name payments-pg `
@@ -159,7 +168,7 @@ A lightweight crypto simulation is wired into the same payment/outbox pipeline t
        "amount": 500000,
        "cryptoCurrency": "USDC",
        "network": "Ethereum-Testnet",
-       "fromWallet": "0xCafeFood00000000000000000000000000000000",
+       "fromWallet": "0xU5AF1A6000000000000000000000000000000000",
        "merchantRef": "order-crypto-42"
      }'
    $cryptoKey = ($cryptoDerive.Content | ConvertFrom-Json).derivedKey
@@ -174,7 +183,7 @@ A lightweight crypto simulation is wired into the same payment/outbox pipeline t
        "amount": 500000,
        "cryptoCurrency": "USDC",
        "network": "Ethereum-Testnet",
-       "fromWallet": "0xCafeFood00000000000000000000000000000000",
+       "fromWallet": "0xU5AF1A6000000000000000000000000000000000",
        "merchantRef": "order-crypto-42"
      }'
    Write-Host "Crypto charge response:" -ForegroundColor Cyan
