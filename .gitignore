@@ -8,3 +8,6 @@ obj/
 *.userprefs
 TestResult*
 .idea/
+node_modules/
+.cache/
+dist/
