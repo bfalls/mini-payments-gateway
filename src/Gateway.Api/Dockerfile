@@ -26,6 +26,8 @@ COPY --from=build /app/publish .
 
 # Kestrel will listen on 8080 inside the container
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+ENV ASPNETCORE_LOGGING__CONSOLE__FORMATTERNAME=Simple
+ENV Logging__LogLevel__Microsoft.AspNetCore=Information
 
 EXPOSE 8080
 

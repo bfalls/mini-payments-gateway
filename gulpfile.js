@@ -11,6 +11,8 @@ const REGION = "us-east-1";
 // Tag used to locate the instance (no instance ID checked in)
 const TAG_KEY = "Project";
 const TAG_VALUE = "mini-payments-gateway";
+const SSH_KEY_FILE = "mini-payments-gateway.pem";
+const SSH_USER = "ec2-user";
 
 // ----------------------------------------------------------------------
 
@@ -125,6 +127,20 @@ function ec2Config(done) {
     const info = runAws(cmd, { silent: true });
     console.log("Instance config:");
     console.log(info);
+
+    // Try to build SSH connect command from the JSON
+    try {
+        const instance = JSON.parse(info);
+        if (instance.PublicDns) {
+            const sshCmd = `ssh -i "${SSH_KEY_FILE}" ${SSH_USER}@${instance.PublicDns}`;
+            console.log("SSH connect command:");
+            console.log(sshCmd);
+        } else {
+            console.warn("No PublicDns found in instance config; cannot build SSH command.");
+        }
+    } catch (err) {
+        console.warn("Failed to parse instance config JSON; cannot build SSH command.", err);
+    }
     done();
 }
 

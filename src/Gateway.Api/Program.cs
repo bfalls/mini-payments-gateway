@@ -28,6 +28,12 @@ b.Services.AddSwaggerGen();
 
 var app = b.Build();
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                       Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
 if (app.Configuration.GetValue<bool>("AutoMigrate") || app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
